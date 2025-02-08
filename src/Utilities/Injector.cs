@@ -2,7 +2,7 @@ using System.Text;
 
 namespace LegacyLauncher.Utilities {
     public static class Injector {
-        static void Inject(string dllPath, int processId) {
+        public static void Inject(string dllPath, int processId) {
             IntPtr hProcess = Win32.OpenProcess(Win32.PROCESS_CREATE_THREAD | Win32.PROCESS_QUERY_INFORMATION | Win32.PROCESS_VM_OPERATION | Win32.PROCESS_VM_WRITE | Win32.PROCESS_VM_READ, false, processId);
 
             if (hProcess == IntPtr.Zero)
