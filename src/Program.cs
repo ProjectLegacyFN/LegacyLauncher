@@ -9,10 +9,11 @@ namespace LegacyLauncher {
     public class Program {
         static void Main(string[] args) {
             Console.Title = "LegacyFN Launcher";
-            bool bUseOwnServer = args.Contains("--localserver");
+            bool bUseOwnServer = args.Contains("--local");
+            bool bIsServer = args.Contains("--gameserver");
 
             string WorkingDirectory = Directory.GetCurrentDirectory();
-
+            
             string CobaltPath = Path.Join(WorkingDirectory, "Cobalt.dll");
             string CobaltLocalPath = Path.Join(WorkingDirectory, "CobaltLocal.dll");
 
