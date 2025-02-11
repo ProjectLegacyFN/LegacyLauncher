@@ -9,13 +9,14 @@ namespace LegacyLauncher {
     public class Program {
         static void Main(string[] args) {
             Console.Title = "LegacyFN Launcher";
-            bool bUseOwnServer = args.Contains("--local");
             bool bIsServer = args.Contains("--gameserver");
 
             string WorkingDirectory = Directory.GetCurrentDirectory();
             
             string CobaltPath = Path.Join(WorkingDirectory, "Cobalt.dll");
             string CobaltLocalPath = Path.Join(WorkingDirectory, "CobaltLocal.dll");
+            string RebootPath = Path.Join(WorkingDirectory, "Reboot.dll");
+            string MemoryLeakFixPath = Path.Join(WorkingDirectory, "MemoryLeakFix.dll");
 
             if (!File.Exists(CobaltPath)) {
                 Console.WriteLine("Downloading Cobalt DLL...");
@@ -29,7 +30,19 @@ namespace LegacyLauncher {
                     client.DownloadFile("https://dl.dropboxusercontent.com/scl/fi/4l1s9t9eo014kgc9vrvsf/CobaltLocal.dll?rlkey=ain4yzn4blfb4r34cr1i7wf01&st=xg6myikt&dl=0", CobaltLocalPath);
             }
 
-            string ConfigPath = Path.Join(WorkingDirectory, "config.json");
+            if (!File.Exists(RebootPath)) {
+                Console.WriteLine("Downloading Reboot DLL...");
+                using (WebClient client = new WebClient())
+                    client.DownloadFile("https://github.com/ProjectLegacyFN/LegacyReboot/releases/download/1.0/Reboot.dll", RebootPath);
+            }
+
+            if (!File.Exists(MemoryLeakFixPath)) {
+                Console.WriteLine("Downloading MemoryLeakFix DLL...");
+                using (WebClient client = new WebClient())
+                    client.DownloadFile("https://dl.dropboxusercontent.com/scl/fi/u5sgdzflenzt6kt3epb0q/MemoryLeakFix.dll?rlkey=1othr24jwsqk52sq2q6u6heil&st=cd228i1z&dl=0", MemoryLeakFixPath);
+            }
+
+            string ConfigPath = bIsServer ? Path.Join(WorkingDirectory, "serverconfig.json") : Path.Join(WorkingDirectory, "config.json");
             Config config = new Config();
             if (File.Exists(ConfigPath)) {
                 string jsonString = File.ReadAllText(ConfigPath);
@@ -118,10 +131,16 @@ namespace LegacyLauncher {
             ShippingProcess.Start();
 
             // Inject DLLs
-            if (bUseOwnServer)
-                Injector.Inject(CobaltLocalPath, ShippingProcess.Id);
-            else
-                Injector.Inject(CobaltPath, ShippingProcess.Id);
+            Injector.Inject(MemoryLeakFixPath, ShippingProcess.Id);
+            Injector.Inject(CobaltPath, ShippingProcess.Id);
+
+            if (bIsServer) {
+                new Thread(delegate() {
+                    Console.Write("Press ENTER to inject Reboot!");
+                    Console.ReadLine();
+                    Injector.Inject(RebootPath, ShippingProcess.Id);
+                }).Start();
+            }
 
             ShippingProcess.WaitForExit();
             if (FNLauncherProcess != null) FNLauncherProcess.Kill();
