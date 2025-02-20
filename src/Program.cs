@@ -10,6 +10,7 @@ namespace LegacyLauncher {
         static void Main(string[] args) {
             Console.Title = "LegacyFN Launcher";
             bool bIsServer = args.Contains("--gameserver");
+            bool bIsLocalHost = args.Contains("--localhost");
 
             string WorkingDirectory = Directory.GetCurrentDirectory();
             
@@ -131,8 +132,10 @@ namespace LegacyLauncher {
             ShippingProcess.Start();
 
             // Inject DLLs
-            Injector.Inject(MemoryLeakFixPath, ShippingProcess.Id);
-            Injector.Inject(CobaltPath, ShippingProcess.Id);
+            if (!bIsLocalHost)
+                Injector.Inject(CobaltPath, ShippingProcess.Id);
+            else
+                Injector.Inject(CobaltLocalPath, ShippingProcess.Id);
 
             if (bIsServer) {
                 new Thread(delegate() {
