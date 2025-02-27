@@ -9,16 +9,14 @@ namespace LegacyLauncher {
     public class Program {
         static void Main(string[] args) {
             Console.Title = "LegacyFN Launcher";
-            bool bIsServer = args.Contains("--gameserver");
-            bool bIsLocalHost = args.Contains("--localhost");
 
             string WorkingDirectory = Directory.GetCurrentDirectory();
             
             string CobaltPath = Path.Join(WorkingDirectory, "Cobalt.dll");
             string CobaltLocalPath = Path.Join(WorkingDirectory, "CobaltLocal.dll");
             string RebootPath = Path.Join(WorkingDirectory, "Reboot.dll");
-            string MemoryLeakFixPath = Path.Join(WorkingDirectory, "MemoryLeakFix.dll");
 
+            // In reality I shouldn't use WebClient
             if (!File.Exists(CobaltPath)) {
                 Console.WriteLine("Downloading Cobalt DLL...");
                 using (WebClient client = new WebClient())
@@ -37,35 +35,30 @@ namespace LegacyLauncher {
                     client.DownloadFile("https://github.com/ProjectLegacyFN/LegacyReboot/releases/download/1.0/Reboot.dll", RebootPath);
             }
 
-            if (!File.Exists(MemoryLeakFixPath)) {
-                Console.WriteLine("Downloading MemoryLeakFix DLL...");
-                using (WebClient client = new WebClient())
-                    client.DownloadFile("https://dl.dropboxusercontent.com/scl/fi/u5sgdzflenzt6kt3epb0q/MemoryLeakFix.dll?rlkey=1othr24jwsqk52sq2q6u6heil&st=cd228i1z&dl=0", MemoryLeakFixPath);
-            }
+            ArgParser Arguments = new ArgParser(args);
 
-            string ConfigPath = bIsServer ? Path.Join(WorkingDirectory, "serverconfig.json") : Path.Join(WorkingDirectory, "config.json");
-            Config config = new Config();
+            string ConfigPath = Arguments.ConfigPath != null ? Arguments.ConfigPath : Path.Join(WorkingDirectory, "config.json");
+            Config config;
             if (File.Exists(ConfigPath)) {
-                string jsonString = File.ReadAllText(ConfigPath);
-                config = JsonSerializer.Deserialize<Config>(jsonString);
+                string jText = File.ReadAllText(ConfigPath);
+                config = JsonSerializer.Deserialize<Config>(jText);
             } else {
-                string? username = null;
-                while (username == null) {
+
+                string? _Username = null;
+                while (_Username == null) {
                     Console.Write("Enter E-mail: ");
-                    username = Console.ReadLine();
+                    _Username = Console.ReadLine();
                 }
 
-                string? password = null;
-                while (password == null) {
+                string? _Password = null;
+                while (_Password == null) {
                     Console.Write("Enter Password: ");
-                    password = Console.ReadLine();
+                    _Password = Console.ReadLine();
                 }
 
-                config.Email = username;
-                config.Password = password;
-
+                string _FortnitePath;
                 if (Directory.Exists(Path.Join(WorkingDirectory, "FortniteGame")) && Directory.Exists(Path.Join(WorkingDirectory, "Engine")))
-                    config.FortnitePath = WorkingDirectory;
+                    _FortnitePath = WorkingDirectory;
                 else {
                     string? path = null;
                     while (path == null) {
@@ -73,14 +66,16 @@ namespace LegacyLauncher {
                         path = Console.ReadLine();
                     }
 
-                    config.FortnitePath = path;
+                    _FortnitePath = path;
                 }
 
+                config = new Config(_Username, _Password, _FortnitePath);
                 string jsonString = JsonSerializer.Serialize(config);
                 File.WriteAllText(ConfigPath, jsonString);
             }
-
-            string BinariesPath = Path.Join(config.FortnitePath, "FortniteGame\\Binaries\\Win64");
+            
+            string FortnitePath = Arguments.FortnitePath != null ? Arguments.FortnitePath : config.FortnitePath;
+            string BinariesPath = Path.Join(FortnitePath, "FortniteGame\\Binaries\\Win64");
             string ShippingPath = Path.Join(BinariesPath, "FortniteClient-Win64-Shipping.exe");
             string FNLauncherPath = Path.Join(BinariesPath, "FortniteLauncher.exe");
             string EACShippingPath = Path.Join(BinariesPath, "FortniteClient-Win64-Shipping_EAC.exe");
@@ -91,7 +86,11 @@ namespace LegacyLauncher {
                 return;
             }
 
-            string launchArgs = $"-epicapp=Fortnite -epicenv=Prod -epiclocale=en-us -epicportal -skippatchcheck -NOSSLPINNING -nobe -fromfl=eac -fltoken=7a848a93a74ba68876c36C1c -AUTH_LOGIN={config.Email} -AUTH_PASSWORD={config.Password} -AUTH_TYPE=epic";
+            // Putting together launch args for Fortnite
+            string Email = Arguments.Email != null ? Arguments.Email : config.Email;
+            string Password = Arguments.Password != null ? Arguments.Password : config.Password;
+
+            string launchArgs = $"-epicapp=Fortnite -epicenv=Prod -epiclocale=en-us -epicportal -skippatchcheck -NOSSLPINNING -nobe -fromfl=eac -fltoken=7a848a93a74ba68876c36C1c -AUTH_LOGIN={Email} -AUTH_PASSWORD={Password} -AUTH_TYPE=epic";
             Process? FNLauncherProcess  = null;
             Process? EACShippingProcess = null;
             if (File.Exists(FNLauncherPath)) {
@@ -132,12 +131,12 @@ namespace LegacyLauncher {
             ShippingProcess.Start();
 
             // Inject DLLs
-            if (!bIsLocalHost)
+            if (!Arguments.bUseLocalHostServer)
                 Injector.Inject(CobaltPath, ShippingProcess.Id);
             else
                 Injector.Inject(CobaltLocalPath, ShippingProcess.Id);
 
-            if (bIsServer) {
+            if (Arguments.bRunAsGameServer) {
                 new Thread(delegate() {
                     Console.Write("Press ENTER to inject Reboot!");
                     Console.ReadLine();
